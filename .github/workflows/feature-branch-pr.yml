@@ -1,0 +1,60 @@
+name: "Automate Feature Branch Creation & PR Merge"
+
+on:
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  create-feature-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: develop  # Start from develop branch
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create Feature Branch
+        run: |
+          FEATURE_BRANCH="feature-auto-${{ github.run_id }}"
+          git checkout -b $FEATURE_BRANCH
+          echo "FEATURE_BRANCH=$FEATURE_BRANCH" >> $GITHUB_ENV
+
+      - name: Push Empty Commit
+        run: |
+          git commit --allow-empty -m "Initial empty commit for PR"
+          git push origin $FEATURE_BRANCH
+
+      - name: Create Pull Request
+        id: create_pr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          base: develop
+          branch: ${{ env.FEATURE_BRANCH }}
+          title: "Auto PR - ${{ env.FEATURE_BRANCH }}"
+          body: "This PR was created automatically."
+          labels: "automated"
+
+  approve-and-merge:
+    needs: create-feature-branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approve PR
+        uses: hmarr/auto-approve-action@v3
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Merge PR
+        run: |
+          PR_NUMBER=$(gh pr list --base develop --head ${{ env.FEATURE_BRANCH }} --json number --jq '.[0].number')
+          gh pr merge $PR_NUMBER --admin --squash
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      - name: Delete Feature Branch
+        run: |
+          git push origin --delete ${{ env.FEATURE_BRANCH }}
