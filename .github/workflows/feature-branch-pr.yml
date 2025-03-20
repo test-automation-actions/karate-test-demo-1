@@ -3,6 +3,10 @@ name: "Automate Feature Branch Creation & PR Merge"
 on:
   workflow_dispatch:  # Allows manual triggering
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   create-feature-branch:
     runs-on: ubuntu-latest
