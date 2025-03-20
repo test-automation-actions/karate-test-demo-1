@@ -26,7 +26,8 @@ jobs:
       - name: Push Empty Commit
         run: |
           git commit --allow-empty -m "Initial empty commit for PR"
-          git push origin $FEATURE_BRANCH
+          # git push origin $FEATURE_BRANCH
+          git push https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/test-automation-actions/karate-test-demo-1.git HEAD:refs/heads/${{ env.FEATURE_BRANCH }}
 
       - name: Create Pull Request
         id: create_pr
@@ -46,14 +47,14 @@ jobs:
       - name: Approve PR
         uses: hmarr/auto-approve-action@v3
         with:
-          github-token: ${{ secrets.PAT_TOKEN }}
+          github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
       - name: Merge PR
         run: |
           PR_NUMBER=$(gh pr list --base develop --head ${{ env.FEATURE_BRANCH }} --json number --jq '.[0].number')
           gh pr merge $PR_NUMBER --admin --squash
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
       - name: Delete Feature Branch
         run: |
