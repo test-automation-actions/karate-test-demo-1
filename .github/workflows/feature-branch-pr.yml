@@ -42,6 +42,11 @@ jobs:
     outputs:
       pr_number: ${{ steps.get_pr.outputs.PR_NUMBER }}
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          
       - name: Create Pull Request
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -63,6 +68,11 @@ jobs:
     needs: create-pull-request
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          
       - name: Approve PR
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
