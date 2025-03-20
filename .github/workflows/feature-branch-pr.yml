@@ -33,33 +33,42 @@ jobs:
           # git push origin $FEATURE_BRANCH
           git push https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/test-automation-actions/karate-test-demo-1.git HEAD:refs/heads/${{ env.FEATURE_BRANCH }}
 
-      - name: Create Pull Request
-        id: create_pr
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          base: develop
-          branch: ${{ env.FEATURE_BRANCH }}
-          title: "Auto PR - ${{ env.FEATURE_BRANCH }}"
-          body: "This PR was created automatically."
-          labels: "automated"
+      # - name: Create Pull Request
+      #   id: create_pr
+      #   uses: peter-evans/create-pull-request@v6
+      #   with:
+      #     token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      #     base: develop
+      #     branch: ${{ env.FEATURE_BRANCH }}
+      #     title: "Auto PR - ${{ env.FEATURE_BRANCH }}"
+      #     body: "This PR was created automatically."
+      #     labels: "automated"
 
-  approve-and-merge:
+  create-pull-request:
     needs: create-feature-branch
     runs-on: ubuntu-latest
     steps:
-      - name: Approve PR
-        uses: hmarr/auto-approve-action@v3
-        with:
-          github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-
-      - name: Merge PR
-        run: |
-          PR_NUMBER=$(gh pr list --base develop --head ${{ env.FEATURE_BRANCH }} --json number --jq '.[0].number')
-          gh pr merge $PR_NUMBER --admin --squash
+      - name: Create Pull Request
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-
-      - name: Delete Feature Branch
         run: |
-          git push origin --delete ${{ env.FEATURE_BRANCH }}
+          PR_URL=$(gh pr create --base develop --head ${{ env.FEATURE_BRANCH }} --title "Auto PR for ${{ env.FEATURE_BRANCH }}" --body "This is an automated PR.")
+          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
+
+  approve-and-merge-pr:
+    needs: create-pull-request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approve PR
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
+          PR_NUMBER=$(gh pr list --head ${{ env.FEATURE_BRANCH }} --json number --jq '.[0].number')
+          gh pr review $PR_NUMBER --approve
+
+      - name: Merge PR
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
+          PR_NUMBER=$(gh pr list --head ${{ env.FEATURE_BRANCH }} --json number --jq '.[0].number')
+          gh pr merge $PR_NUMBER --squash --delete-branch
