@@ -40,18 +40,25 @@ jobs:
     needs: create-feature-branch
     runs-on: ubuntu-latest
     outputs:
-      pr_number: ${{ steps.create_pr.outputs.PR_NUMBER }}
+      pr_number: ${{ steps.get_pr.outputs.PR_NUMBER }}
     steps:
       - name: Create Pull Request
-        id: create_pr
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
           PR_TITLE="Auto PR for ${{ needs.create-feature-branch.outputs.feature_branch }}"
           PR_BODY="This is an automated PR."
-          PR_NUMBER=$(gh pr create --base develop --head "${{ needs.create-feature-branch.outputs.feature_branch }}" --title "$PR_TITLE" --body "$PR_BODY" --json number --jq '.number')
-          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_OUTPUT  # Save PR number as output
+          gh pr create --base develop --head "${{ needs.create-feature-branch.outputs.feature_branch }}" --title "$PR_TITLE" --body "$PR_BODY"
 
+      - name: Get PR Number
+        id: get_pr
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
+          PR_NUMBER=$(gh pr list --head "${{ needs.create-feature-branch.outputs.feature_branch }}" --state open --json number --jq '.[0].number')
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_OUTPUT
+          
   approve-and-merge-pr:
     needs: create-pull-request
     runs-on: ubuntu-latest
