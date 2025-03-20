@@ -1,7 +1,7 @@
 name: "Automate Feature Branch Creation & PR Merge"
 
 on:
-  workflow_dispatch:  # Allows manual triggering
+  workflow_dispatch:  # Manually trigger this workflow
 
 permissions:
   contents: write
@@ -10,50 +10,47 @@ permissions:
 jobs:
   create-feature-branch:
     runs-on: ubuntu-latest
+    outputs:
+      feature_branch: ${{ steps.set_branch.outputs.FEATURE_BRANCH }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          ref: develop  # Start from develop branch
+          ref: develop  
 
-      - name: Configure Git
+      - name: Configure Git User
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Create Feature Branch
+        id: set_branch
         run: |
           FEATURE_BRANCH="feature-auto-${{ github.run_id }}"
-          git checkout -b $FEATURE_BRANCH
           echo "FEATURE_BRANCH=$FEATURE_BRANCH" >> $GITHUB_ENV
+          echo "FEATURE_BRANCH=$FEATURE_BRANCH" >> $GITHUB_OUTPUT  # Save as output
 
       - name: Push Empty Commit
         run: |
+          git checkout -b "$FEATURE_BRANCH"
           git commit --allow-empty -m "Initial empty commit for PR"
-          # git push origin $FEATURE_BRANCH
-          git push https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/test-automation-actions/karate-test-demo-1.git HEAD:refs/heads/${{ env.FEATURE_BRANCH }}
-
-      # - name: Create Pull Request
-      #   id: create_pr
-      #   uses: peter-evans/create-pull-request@v6
-      #   with:
-      #     token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-      #     base: develop
-      #     branch: ${{ env.FEATURE_BRANCH }}
-      #     title: "Auto PR - ${{ env.FEATURE_BRANCH }}"
-      #     body: "This PR was created automatically."
-      #     labels: "automated"
+          git push https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/test-automation-actions/karate-test-demo-1.git HEAD:refs/heads/$FEATURE_BRANCH
 
   create-pull-request:
     needs: create-feature-branch
     runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.create_pr.outputs.PR_NUMBER }}
     steps:
       - name: Create Pull Request
+        id: create_pr
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
-          PR_URL=$(gh pr create --base develop --head ${{ env.FEATURE_BRANCH }} --title "Auto PR for ${{ env.FEATURE_BRANCH }}" --body "This is an automated PR.")
-          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
+          PR_TITLE="Auto PR for ${{ needs.create-feature-branch.outputs.feature_branch }}"
+          PR_BODY="This is an automated PR."
+          PR_NUMBER=$(gh pr create --base develop --head "${{ needs.create-feature-branch.outputs.feature_branch }}" --title "$PR_TITLE" --body "$PR_BODY" --json number --jq '.number')
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_OUTPUT  # Save PR number as output
 
   approve-and-merge-pr:
     needs: create-pull-request
@@ -63,12 +60,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
-          PR_NUMBER=$(gh pr list --head ${{ env.FEATURE_BRANCH }} --json number --jq '.[0].number')
-          gh pr review $PR_NUMBER --approve
+          gh pr review ${{ needs.create-pull-request.outputs.pr_number }} --approve
 
       - name: Merge PR
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
-          PR_NUMBER=$(gh pr list --head ${{ env.FEATURE_BRANCH }} --json number --jq '.[0].number')
-          gh pr merge $PR_NUMBER --squash --delete-branch
+          gh pr merge ${{ needs.create-pull-request.outputs.pr_number }} --squash --delete-branch
